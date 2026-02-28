@@ -1,0 +1,1256 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>2048 TOKEN — Play & Earn</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #04050d;
+  --s1: #080c1a;
+  --s2: #0d1225;
+  --card: #0f1530;
+  --border: #1a2445;
+  --border2: #2a3860;
+  --g1: #00f5a0;
+  --g2: #00d9f5;
+  --g3: #7b2ff7;
+  --gold: #ffd700;
+  --warn: #ff6b35;
+  --text: #c8d8f0;
+  --muted: #3a5080;
+  --danger: #ff3366;
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Mono', monospace;
+  min-height: 100vh;
+  overflow-x: hidden;
+  position: relative;
+}
+
+/* Animated grid bg */
+body::before {
+  content:'';
+  position:fixed;inset:0;
+  background-image:
+    linear-gradient(rgba(0,245,160,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,245,160,0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  animation: gridScroll 20s linear infinite;
+  pointer-events:none;z-index:0;
+}
+@keyframes gridScroll { to { background-position: 0 40px; } }
+
+body::after {
+  content:'';
+  position:fixed;inset:0;
+  background: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(0,245,160,0.12) 0%, transparent 60%),
+              radial-gradient(ellipse 60% 60% at 100% 100%, rgba(123,47,247,0.08) 0%, transparent 50%);
+  pointer-events:none;z-index:0;
+}
+
+/* ─── LAYOUT ─────────────────────────────────────── */
+.app { position:relative;z-index:1;max-width:1200px;margin:0 auto;padding:16px; }
+
+/* ─── TOPBAR ─────────────────────────────────────── */
+.topbar {
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 20px;
+  background: rgba(8,12,26,0.8);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(12px);
+  margin-bottom:20px;
+}
+
+.logo {
+  font-family:'Orbitron',sans-serif;
+  font-size:1.4rem;font-weight:900;
+  background: linear-gradient(90deg, var(--g1), var(--g2));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  letter-spacing:2px;
+}
+.logo span { color:var(--g3);-webkit-text-fill-color:var(--g3); }
+
+.token-info {
+  display:flex;gap:20px;align-items:center;
+}
+.ti-item { text-align:center; }
+.ti-label { font-size:0.55rem;color:var(--muted);letter-spacing:2px;text-transform:uppercase; }
+.ti-val { font-size:0.85rem;color:var(--g1);font-weight:500; }
+
+.wallet-btn {
+  display:flex;align-items:center;gap:8px;
+  padding:8px 16px;
+  background: linear-gradient(135deg, rgba(0,245,160,0.1), rgba(0,217,245,0.1));
+  border: 1px solid var(--g1);
+  color: var(--g1);
+  font-family:'DM Mono',monospace;
+  font-size:0.75rem;cursor:pointer;
+  letter-spacing:1px;text-transform:uppercase;
+  transition:all 0.2s;position:relative;overflow:hidden;
+}
+.wallet-btn:hover { background: rgba(0,245,160,0.2); box-shadow: 0 0 20px rgba(0,245,160,0.3); }
+.wallet-btn.connected { border-color:var(--g2);color:var(--g2); }
+.wallet-dot { width:7px;height:7px;border-radius:50%;background:var(--g1); }
+.wallet-dot.pulse { animation: walletPulse 2s infinite; }
+@keyframes walletPulse { 0%,100%{box-shadow:0 0 0 0 rgba(0,245,160,0.4)} 50%{box-shadow:0 0 0 6px rgba(0,245,160,0)} }
+
+/* ─── TABS ─────────────────────────────────────────── */
+.tabs {
+  display:flex;gap:4px;margin-bottom:20px;
+  border-bottom:1px solid var(--border);
+  padding-bottom:0;
+}
+.tab {
+  padding:10px 20px;font-family:'DM Mono',monospace;
+  font-size:0.72rem;letter-spacing:1.5px;text-transform:uppercase;
+  cursor:pointer;border:none;background:transparent;
+  color:var(--muted);position:relative;transition:color 0.2s;
+}
+.tab::after { content:'';position:absolute;bottom:-1px;left:0;right:0;height:2px;background:var(--g1);transform:scaleX(0);transition:transform 0.2s; }
+.tab.active { color:var(--g1); }
+.tab.active::after { transform:scaleX(1); }
+.tab-badge { display:inline-block;padding:1px 6px;font-size:0.5rem;background:rgba(255,107,53,0.2);color:var(--warn);border:1px solid var(--warn);margin-left:6px;vertical-align:middle; }
+
+/* ─── PANELS ─────────────────────────────────────── */
+.panel { display:none; }
+.panel.active { display:block; }
+
+/* ─── GAME PANEL ─────────────────────────────────── */
+.game-layout {
+  display:grid;
+  grid-template-columns: 1fr 320px;
+  gap:20px;
+}
+
+@media(max-width:768px) {
+  .game-layout { grid-template-columns:1fr; }
+  .topbar { flex-wrap:wrap;gap:10px; }
+  .token-info { display:none; }
+}
+
+.game-left {}
+
+/* Score row */
+.score-row {
+  display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;
+}
+.s-box {
+  background:var(--card);border:1px solid var(--border);
+  padding:10px 12px;text-align:center;
+}
+.s-label { font-size:0.55rem;color:var(--muted);letter-spacing:2px;text-transform:uppercase; }
+.s-val { font-size:1.1rem;font-family:'Orbitron',sans-serif;color:var(--text);margin-top:2px; }
+.s-val.green { color:var(--g1); }
+.s-val.gold  { color:var(--gold); }
+
+/* Controls */
+.game-controls { display:flex;gap:8px;margin-bottom:12px; }
+.btn { padding:9px 16px;border:1px solid var(--border);background:var(--card);color:var(--text);font-family:'DM Mono',monospace;font-size:0.72rem;cursor:pointer;letter-spacing:1px;text-transform:uppercase;transition:all 0.15s; }
+.btn:hover { border-color:var(--g1);color:var(--g1); }
+.btn.primary { background:linear-gradient(135deg,var(--g1),var(--g2));color:#000;font-weight:700;border:none; }
+.btn.primary:hover { box-shadow:0 0 20px rgba(0,245,160,0.4); }
+.btn:disabled { opacity:0.35;cursor:not-allowed; }
+.auto-wrap { display:flex;align-items:center;gap:8px; }
+.auto-label { font-size:0.65rem;color:var(--muted);letter-spacing:1px; }
+.toggle { width:38px;height:22px;background:var(--s2);border:1px solid var(--border2);border-radius:11px;cursor:pointer;position:relative;transition:all 0.2s; }
+.toggle::after { content:'';position:absolute;width:14px;height:14px;background:var(--muted);border-radius:50%;top:3px;left:3px;transition:all 0.2s; }
+.toggle.on { background:rgba(0,245,160,0.15);border-color:var(--g1); }
+.toggle.on::after { background:var(--g1);left:19px; }
+
+/* Board */
+.board-wrap { position:relative;margin-bottom:12px; }
+#board {
+  display:grid;grid-template-columns:repeat(4,1fr);gap:7px;
+  background:var(--s1);border:1px solid var(--border2);
+  padding:8px;width:100%;aspect-ratio:1;
+}
+.cell {
+  background:var(--s2);border:1px solid var(--border);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Orbitron',sans-serif;font-weight:700;font-size:1.3rem;
+  transition:all 0.08s;
+}
+.t2    {background:#001f14;color:var(--g1);border-color:#003320;}
+.t4    {background:#00180e;color:#60ffcc;border-color:#002a1e;}
+.t8    {background:#0a1a0a;color:#a0ff60;border-color:#153015;}
+.t16   {background:#1a1200;color:#ffd700;border-color:#2a2000;}
+.t32   {background:#1a0800;color:#ff9500;border-color:#2a1200;}
+.t64   {background:#1a0400;color:#ff5500;border-color:#2a0800;}
+.t128  {background:#050025;color:var(--g2);border-color:#0d0040;}
+.t256  {background:#0a0030;color:#a060ff;border-color:#150050;}
+.t512  {background:#100028;color:#d060ff;border-color:#1e0040;}
+.t1024 {background:#150020;color:#ff40d0;border-color:#250035;}
+.t2048 {background:linear-gradient(135deg,#001a0e,#0a0020);color:#fff;border:1px solid var(--g1);animation:megaGlow 1s infinite alternate;}
+@keyframes megaGlow {
+  from{box-shadow:0 0 20px rgba(0,245,160,0.6),inset 0 0 20px rgba(0,245,160,0.1);}
+  to  {box-shadow:0 0 40px rgba(123,47,247,0.8),inset 0 0 30px rgba(123,47,247,0.15);}
+}
+.new-tile{animation:popIn 0.2s cubic-bezier(0.34,1.56,0.64,1);}
+@keyframes popIn{from{transform:scale(0.4);opacity:0;}to{transform:scale(1);opacity:1;}}
+.merge-tile{animation:mergePop 0.15s ease-out;}
+@keyframes mergePop{50%{transform:scale(1.2);}}
+
+/* Overlay */
+.overlay {
+  display:none;position:absolute;inset:0;
+  background:rgba(4,5,13,0.92);backdrop-filter:blur(8px);
+  flex-direction:column;align-items:center;justify-content:center;
+  gap:16px;z-index:10;
+}
+.overlay.show{display:flex;}
+.overlay h2{font-family:'Orbitron',sans-serif;font-size:2rem;font-weight:900;}
+.overlay .reward-info { background:var(--card);border:1px solid var(--g1);padding:16px 24px;text-align:center; }
+.overlay .reward-info .big { font-family:'Orbitron',sans-serif;font-size:1.6rem;color:var(--g1); }
+.overlay .reward-info small { font-size:0.65rem;color:var(--muted);letter-spacing:2px; }
+
+/* ─── RIGHT SIDEBAR ──────────────────────────────── */
+.sidebar { display:flex;flex-direction:column;gap:14px; }
+
+.side-card {
+  background:var(--card);border:1px solid var(--border);
+  padding:16px;
+}
+.side-title {
+  font-size:0.6rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);
+  margin-bottom:12px;display:flex;align-items:center;gap:8px;
+}
+.side-title::after { content:'';flex:1;height:1px;background:var(--border); }
+
+/* Token balance */
+.token-balance { text-align:center;padding:8px 0; }
+.token-amount { font-family:'Orbitron',sans-serif;font-size:2.2rem;font-weight:900;color:var(--g1);line-height:1; }
+.token-sub { font-size:0.65rem;color:var(--muted);margin-top:4px;letter-spacing:2px; }
+.token-usd { font-size:0.8rem;color:var(--g2);margin-top:8px; }
+
+/* Earn rate */
+.earn-row { display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:0.72rem; }
+.earn-row:last-child{border:none;}
+.earn-key{color:var(--muted);}
+.earn-val{color:var(--g1);}
+
+/* Supply bar */
+.supply-bar { height:6px;background:var(--s2);border:1px solid var(--border);margin:8px 0;position:relative;overflow:hidden; }
+.supply-fill { height:100%;background:linear-gradient(90deg,var(--g1),var(--g2));width:1.2%; }
+.supply-label { font-size:0.6rem;color:var(--muted);display:flex;justify-content:space-between; }
+
+/* AI panel */
+.ai-status { display:flex;align-items:center;gap:8px;margin-bottom:10px; }
+.ai-led { width:8px;height:8px;border-radius:50%;background:var(--muted); }
+.ai-led.on { background:var(--g1);box-shadow:0 0 8px var(--g1);animation:ledBlink 1.5s infinite; }
+@keyframes ledBlink{0%,100%{opacity:1;}50%{opacity:0.4;}}
+#ai-output { font-size:0.72rem;line-height:1.7;min-height:80px;color:var(--text); }
+.ai-move-tag { display:inline-block;background:var(--g1);color:#000;font-weight:700;padding:1px 10px;font-size:0.8rem;font-family:'Orbitron',sans-serif; }
+.thinking::after { content:'';animation:thinkDots 1s steps(4) infinite; }
+@keyframes thinkDots{0%{content:'';}25%{content:'.';}50%{content:'..';}75%{content:'...';}100%{content:'';}}
+
+/* ─── LEADERBOARD PANEL ───────────────────────────── */
+.lb-header { display:flex;align-items:center;justify-content:space-between;margin-bottom:20px; }
+.lb-header h2 { font-family:'Orbitron',sans-serif;font-size:1.4rem;font-weight:900;color:var(--g1); }
+
+.lb-tabs { display:flex;gap:8px;margin-bottom:16px; }
+.lb-tab { padding:6px 14px;font-size:0.65rem;letter-spacing:1px;text-transform:uppercase;border:1px solid var(--border);background:var(--card);color:var(--muted);cursor:pointer; }
+.lb-tab.active { border-color:var(--g1);color:var(--g1); }
+
+.lb-table { width:100%;border-collapse:collapse; }
+.lb-table th { font-size:0.6rem;letter-spacing:2px;color:var(--muted);text-transform:uppercase;padding:8px 12px;text-align:left;border-bottom:1px solid var(--border); }
+.lb-table td { padding:10px 12px;font-size:0.78rem;border-bottom:1px solid var(--border); }
+.lb-table tr:hover td { background:rgba(0,245,160,0.03); }
+.lb-table tr.my-row td { background:rgba(0,245,160,0.06);color:var(--g1); }
+
+.rank-1 { color:var(--gold);font-family:'Orbitron',sans-serif;font-weight:700; }
+.rank-2 { color:#c0c0c0; }
+.rank-3 { color:#cd7f32; }
+.addr-cell { font-family:'DM Mono',monospace;font-size:0.7rem; }
+.score-cell { color:var(--g2); }
+.token-cell { color:var(--g1); }
+
+/* ─── SWAP PANEL ─────────────────────────────────── */
+.swap-coming {
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:400px;text-align:center;gap:20px;
+}
+.swap-icon { font-size:4rem;opacity:0.3; }
+.swap-coming h2 { font-family:'Orbitron',sans-serif;font-size:2rem;font-weight:900; }
+.swap-coming h2 span { color:var(--g1); }
+.swap-coming p { color:var(--muted);font-size:0.8rem;max-width:380px;line-height:1.7; }
+.coming-badge {
+  display:inline-block;padding:6px 20px;
+  border:1px solid var(--warn);color:var(--warn);
+  font-size:0.65rem;letter-spacing:3px;text-transform:uppercase;
+  animation:borderPulse 2s infinite;
+}
+@keyframes borderPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,107,53,0.4);}50%{box-shadow:0 0 0 8px rgba(255,107,53,0);}}
+
+.swap-pairs { display:flex;gap:20px;justify-content:center;margin-top:20px;flex-wrap:wrap; }
+.swap-pair {
+  background:var(--card);border:1px solid var(--border);
+  padding:16px 24px;text-align:center;opacity:0.5;position:relative;overflow:hidden;
+}
+.swap-pair::before { content:'COMING SOON';position:absolute;top:8px;right:-20px;background:var(--warn);color:#000;font-size:0.5rem;letter-spacing:1px;padding:2px 28px;transform:rotate(30deg);font-weight:700; }
+.sp-from { font-family:'Orbitron',sans-serif;font-size:1.1rem;color:var(--g1); }
+.sp-arrow { color:var(--muted);margin:6px 0;font-size:1.2rem; }
+.sp-to { font-family:'Orbitron',sans-serif;font-size:1.1rem;color:var(--warn); }
+.sp-desc { font-size:0.6rem;color:var(--muted);margin-top:6px;letter-spacing:1px; }
+
+/* ─── WALLET MODAL ─────────────────────────────────── */
+.modal-overlay {
+  display:none;position:fixed;inset:0;
+  background:rgba(4,5,13,0.95);backdrop-filter:blur(16px);
+  z-index:100;align-items:center;justify-content:center;
+}
+.modal-overlay.show { display:flex; }
+.modal {
+  background:var(--card);border:1px solid var(--border2);
+  padding:32px;max-width:420px;width:90%;position:relative;
+}
+.modal h3 { font-family:'Orbitron',sans-serif;font-size:1.2rem;margin-bottom:6px;color:var(--g1); }
+.modal p { font-size:0.75rem;color:var(--muted);margin-bottom:24px;line-height:1.6; }
+.modal-close { position:absolute;top:16px;right:16px;background:none;border:none;color:var(--muted);font-size:1.2rem;cursor:pointer; }
+.modal-close:hover{color:var(--text);}
+
+.wallet-section-label { font-size:0.55rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin:14px 0 8px; }
+.wallet-section-label:first-child { margin-top:0; }
+.wallet-divider { height:1px;background:var(--border);margin:14px 0; }
+
+.wallet-options { display:flex;flex-direction:column;gap:8px; }
+.wallet-option {
+  display:flex;align-items:center;gap:14px;
+  padding:13px 16px;background:var(--s1);border:1px solid var(--border);
+  cursor:pointer;transition:all 0.15s;position:relative;
+}
+.wallet-option:hover { border-color:var(--g1);background:rgba(0,245,160,0.05); }
+.wallet-option.featured {
+  border-color:rgba(0,245,160,0.5);
+  background:linear-gradient(135deg,rgba(0,245,160,0.07),rgba(0,217,245,0.04));
+}
+.wallet-option.featured:hover { border-color:var(--g1);box-shadow:0 0 20px rgba(0,245,160,0.15); }
+.wallet-option .wo-icon { width:38px;height:38px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;background:var(--s2);flex-shrink:0; }
+.wallet-option .wo-name { font-size:0.85rem;font-weight:500; }
+.wallet-option .wo-sub { font-size:0.6rem;color:var(--muted); }
+.wallet-option .wo-badge { margin-left:auto;font-size:0.5rem;padding:2px 8px;background:rgba(0,245,160,0.15);color:var(--g1);border:1px solid rgba(0,245,160,0.3);letter-spacing:1px;flex-shrink:0; }
+.wallet-option .wo-badge.detected { background:rgba(0,245,160,0.25);border-color:var(--g1);animation:detectedPulse 2s infinite; }
+@keyframes detectedPulse{0%,100%{opacity:1;}50%{opacity:0.6;}}
+.wallet-option .wo-badge.na { background:rgba(255,107,53,0.1);color:var(--warn);border-color:rgba(255,107,53,0.3); }
+.wo-install { font-size:0.58rem;color:var(--g2);text-decoration:underline;cursor:pointer;margin-top:2px;display:inline-block; }
+.modal-network { font-size:0.62rem;color:var(--muted);text-align:center;margin-top:16px;padding-top:14px;border-top:1px solid var(--border); }
+.modal-network span { color:var(--g1); }
+
+/* Notification toast */
+.toast {
+  position:fixed;bottom:24px;right:24px;
+  background:var(--card);border:1px solid var(--g1);
+  padding:12px 20px;font-size:0.75rem;z-index:200;
+  transform:translateY(100px);opacity:0;transition:all 0.3s;
+  display:flex;align-items:center;gap:10px;
+}
+.toast.show { transform:translateY(0);opacity:1; }
+.toast-icon { color:var(--g1);font-size:1rem; }
+
+/* Token earn fx */
+.earn-fx {
+  position:fixed;pointer-events:none;z-index:50;
+  font-family:'Orbitron',sans-serif;font-size:0.9rem;font-weight:700;
+  color:var(--g1);animation:earnFloat 1.5s ease-out forwards;
+}
+@keyframes earnFloat {
+  0%{opacity:1;transform:translateY(0) scale(1);}
+  100%{opacity:0;transform:translateY(-60px) scale(1.3);}
+}
+
+/* ─── Misc ─────────────────────────────────────────── */
+.divider{height:1px;background:var(--border);margin:16px 0;}
+.text-center{text-align:center;}
+.flex-center{display:flex;align-items:center;justify-content:center;}
+</style>
+</head>
+<body>
+
+<!-- TOAST -->
+<div class="toast" id="toast">
+  <span class="toast-icon">✦</span>
+  <span id="toast-msg">Connected!</span>
+</div>
+
+<!-- WALLET MODAL -->
+<div class="modal-overlay" id="walletModal">
+  <div class="modal" style="max-width:460px;">
+    <button class="modal-close" onclick="closeModal()">✕</button>
+    <h3>Connect Bitcoin Wallet</h3>
+    <p>2048 Token berjalan di Bitcoin via OP_NET. Hubungkan wallet BTC untuk earn & claim token.</p>
+
+    <div class="wallet-options" id="wallet-options-list">
+      <!-- Rendered by JS -->
+    </div>
+
+    <div class="modal-network">
+      Network: <span>Bitcoin Mainnet</span> · Powered by <span>OP_NET</span>
+    </div>
+  </div>
+</div>
+
+<div class="app">
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div class="logo">2048<span>TOKEN</span></div>
+    <div class="token-info">
+      <div class="ti-item"><div class="ti-label">Supply</div><div class="ti-val">10,000,000,000</div></div>
+      <div class="ti-item"><div class="ti-label">Circulating</div><div class="ti-val" id="circ-supply">120,480,000</div></div>
+      <div class="ti-item"><div class="ti-label">Price</div><div class="ti-val">$0.0000024</div></div>
+      <div class="ti-item"><div class="ti-label">Players</div><div class="ti-val" id="player-count">1,247</div></div>
+    </div>
+    <button class="wallet-btn" id="wallet-btn" onclick="openModal()">
+      <div class="wallet-dot" id="wallet-dot"></div>
+      <span id="wallet-text">Connect Wallet</span>
+    </button>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('game', this)">🎮 Play</button>
+    <button class="tab" onclick="switchTab('leaderboard', this)">🏆 Leaderboard</button>
+    <button class="tab" onclick="switchTab('swap', this)">⇄ Swap <span class="tab-badge">SOON</span></button>
+  </div>
+
+  <!-- ── GAME PANEL ─────────────────────────────────── -->
+  <div class="panel active" id="panel-game">
+    <div class="game-layout">
+
+      <!-- LEFT: BOARD -->
+      <div class="game-left">
+        <!-- Scores -->
+        <div class="score-row">
+          <div class="s-box"><div class="s-label">Score</div><div class="s-val" id="score">0</div></div>
+          <div class="s-box"><div class="s-label">Best</div><div class="s-val gold" id="best">0</div></div>
+          <div class="s-box"><div class="s-label">2048 Earned</div><div class="s-val green" id="session-earn">0</div></div>
+          <div class="s-box"><div class="s-label">Moves</div><div class="s-val" id="moves">0</div></div>
+        </div>
+
+        <!-- Controls -->
+        <div class="game-controls">
+          <button class="btn" onclick="newGame()">↺ Restart</button>
+          <div class="auto-wrap">
+            <span class="auto-label">AUTO</span>
+            <div class="toggle" id="auto-toggle" onclick="toggleAuto()"></div>
+          </div>
+          <button class="btn primary" id="ai-btn" onclick="askAI()">⚡ AI Move</button>
+        </div>
+
+        <!-- Board -->
+        <div class="board-wrap">
+          <div id="board"></div>
+          <div class="overlay" id="overlay">
+            <h2 id="overlay-title" style="color:var(--g1)">Game Over</h2>
+            <p id="overlay-sub" style="font-size:0.7rem;color:var(--muted);letter-spacing:2px">NO MORE MOVES</p>
+            <div class="reward-info">
+              <div class="big" id="overlay-earn">+0</div>
+              <small>2048 TOKENS EARNED THIS GAME</small>
+            </div>
+            <button class="btn primary" onclick="newGame()">Play Again</button>
+          </div>
+        </div>
+
+        <!-- Arrow controls -->
+        <div style="display:grid;grid-template-columns:repeat(3,48px);gap:6px;margin-top:8px;">
+          <div></div>
+          <button class="btn" onclick="doMove('up')" style="padding:8px;font-size:1rem;">↑</button>
+          <div></div>
+          <button class="btn" onclick="doMove('left')" style="padding:8px;font-size:1rem;">←</button>
+          <button class="btn" onclick="doMove('down')" style="padding:8px;font-size:1rem;">↓</button>
+          <button class="btn" onclick="doMove('right')" style="padding:8px;font-size:1rem;">→</button>
+        </div>
+      </div>
+
+      <!-- RIGHT: SIDEBAR -->
+      <div class="sidebar">
+
+        <!-- Token Balance -->
+        <div class="side-card">
+          <div class="side-title">Token Balance</div>
+          <div class="token-balance">
+            <div class="token-amount" id="token-balance">0</div>
+            <div class="token-sub">2048 TOKEN</div>
+            <div class="token-usd" id="token-usd">≈ $0.000000</div>
+          </div>
+          <div class="divider"></div>
+          <div class="supply-bar"><div class="supply-fill" id="supply-fill"></div></div>
+          <div class="supply-label">
+            <span id="supply-pct">1.20% distributed</span>
+            <span>10B max</span>
+          </div>
+        </div>
+
+        <!-- Earn Rate -->
+        <div class="side-card">
+          <div class="side-title">Earn Rate</div>
+          <div class="earn-row"><span class="earn-key">Per 100 pts</span><span class="earn-val">+1 TOKEN</span></div>
+          <div class="earn-row"><span class="earn-key">Tile 128</span><span class="earn-val">+50 BONUS</span></div>
+          <div class="earn-row"><span class="earn-key">Tile 256</span><span class="earn-val">+150 BONUS</span></div>
+          <div class="earn-row"><span class="earn-key">Tile 512</span><span class="earn-val">+400 BONUS</span></div>
+          <div class="earn-row"><span class="earn-key">Tile 1024</span><span class="earn-val">+1,000 BONUS</span></div>
+          <div class="earn-row"><span class="earn-key">Tile 2048 🏆</span><span class="earn-val">+5,000 BONUS</span></div>
+        </div>
+
+        <!-- AI Agent -->
+        <div class="side-card">
+          <div class="side-title">AI Agent</div>
+          <div class="ai-status">
+            <div class="ai-led" id="ai-led"></div>
+            <span style="font-size:0.65rem;color:var(--muted);letter-spacing:1px">MCP · ai.opnet.org</span>
+          </div>
+          <div id="ai-output">Tekan <strong>⚡ AI Move</strong> untuk analisis papan secara real-time.</div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ── LEADERBOARD PANEL ───────────────────────────── -->
+  <div class="panel" id="panel-leaderboard">
+    <div class="lb-header">
+      <h2>🏆 Leaderboard</h2>
+      <button class="btn" onclick="refreshLeaderboard()">↺ Refresh</button>
+    </div>
+
+    <div class="lb-tabs">
+      <button class="lb-tab active" onclick="switchLbTab('score', this)">By Score</button>
+      <button class="lb-tab" onclick="switchLbTab('token', this)">By Token</button>
+      <button class="lb-tab" onclick="switchLbTab('weekly', this)">Weekly</button>
+    </div>
+
+    <div style="background:var(--card);border:1px solid var(--border);overflow:hidden;">
+      <table class="lb-table" id="lb-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Wallet</th>
+            <th>Best Score</th>
+            <th>2048 Tokens</th>
+            <th>Best Tile</th>
+          </tr>
+        </thead>
+        <tbody id="lb-body"></tbody>
+      </table>
+    </div>
+
+    <div style="margin-top:16px;font-size:0.65rem;color:var(--muted);text-align:center;">
+      Data refreshes every 60 seconds · Connect wallet to appear on leaderboard
+    </div>
+
+    <!-- My stats -->
+    <div style="margin-top:20px;background:var(--card);border:1px solid var(--g1);padding:20px;">
+      <div class="side-title" style="margin-bottom:12px;">Your Stats</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
+        <div class="s-box"><div class="s-label">Rank</div><div class="s-val" id="my-rank">—</div></div>
+        <div class="s-box"><div class="s-label">Best Score</div><div class="s-val green" id="my-best-lb">0</div></div>
+        <div class="s-box"><div class="s-label">Total Tokens</div><div class="s-val gold" id="my-tokens-lb">0</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SWAP PANEL ─────────────────────────────────── -->
+  <div class="panel" id="panel-swap">
+    <div class="swap-coming">
+      <div class="swap-icon">⇄</div>
+      <div class="coming-badge">Coming Soon</div>
+      <h2>Token <span>Swap</span></h2>
+      <p>Tukar token 2048 kamu ke token lainnya. Fitur ini sedang dalam pengembangan dan akan segera hadir di platform kami.</p>
+
+      <div class="swap-pairs">
+        <div class="swap-pair">
+          <div class="sp-from">2048</div>
+          <div class="sp-arrow">⇄</div>
+          <div class="sp-to">PILL</div>
+          <div class="sp-desc">2048 → Pill Token</div>
+        </div>
+        <div class="swap-pair">
+          <div class="sp-from">2048</div>
+          <div class="sp-arrow">⇄</div>
+          <div class="sp-to">MOTO</div>
+          <div class="sp-desc">2048 → Moto Token</div>
+        </div>
+      </div>
+
+      <div style="margin-top:24px;background:var(--card);border:1px solid var(--border);padding:20px;max-width:400px;text-align:left;">
+        <div class="side-title" style="margin-bottom:10px;">Planned Features</div>
+        <div style="font-size:0.72rem;line-height:2;color:var(--muted);">
+          ✦ AMM liquidity pools<br>
+          ✦ Slippage control<br>
+          ✦ Cross-chain bridge<br>
+          ✦ LP token rewards<br>
+          ✦ Governance voting
+        </div>
+      </div>
+
+      <div style="font-size:0.65rem;color:var(--muted);letter-spacing:2px;">JOIN WAITLIST TO GET EARLY ACCESS</div>
+      <div style="display:flex;gap:8px;">
+        <input type="email" placeholder="your@email.com" style="flex:1;padding:10px;background:var(--card);border:1px solid var(--border);color:var(--text);font-family:'DM Mono',monospace;font-size:0.75rem;max-width:260px;">
+        <button class="btn primary" onclick="joinWaitlist()" style="flex:none;">Notify Me</button>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /app -->
+
+<script>
+// ═══════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════
+const MCP_URL = "https://ai.opnet.org/mcp";
+const TOKEN_PRICE = 0.0000024;
+const SUPPLY = 10_000_000_000;
+
+let grid = [], score = 0, best = 0, moves = 0, gameOver = false;
+let tokenBalance = 0, sessionEarned = 0;
+let circSupply = 120_480_000;
+let milestones = new Set(); // track bonus milestones per game
+
+let autoMode = false, autoTimer = null;
+let aiThinking = false;
+let walletConnected = false, walletAddress = '';
+let walletProvider = '';
+let currentLbTab = 'score';
+
+// ═══════════════════════════════════════════════
+// TABS
+// ═══════════════════════════════════════════════
+function switchTab(name, el) {
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('panel-'+name).classList.add('active');
+  el.classList.add('active');
+  if (name==='leaderboard') renderLeaderboard();
+}
+
+function switchLbTab(tab, el) {
+  currentLbTab = tab;
+  document.querySelectorAll('.lb-tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  renderLeaderboard();
+}
+
+// ═══════════════════════════════════════════════
+// WALLET — BTC Native (OPNet, UniSat, Xverse, OKX, Leather)
+// ═══════════════════════════════════════════════
+
+const BTC_WALLETS = [
+  {
+    id: 'opnet',
+    name: 'OP_WALLET',
+    sub: 'Official OPNet Bitcoin Wallet',
+    icon: '⬡',
+    iconStyle: 'background:linear-gradient(135deg,#00f5a0,#00d9f5);color:#000;font-size:1.1rem;font-weight:900;font-family:Orbitron,sans-serif;',
+    detect: () => !!(window.opnet || window.OpNetProvider),
+    connect: connectOpNet,
+    install: 'https://chromewebstore.google.com/detail/opwallet/pmbjpcmaaladnfpacpmhmnfmpklgbdjb',
+    featured: true,
+    badge: 'RECOMMENDED',
+  },
+  {
+    id: 'unisat',
+    name: 'UniSat Wallet',
+    sub: 'Bitcoin Ordinals & BRC-20',
+    icon: '🟠',
+    detect: () => !!window.unisat,
+    connect: connectUniSat,
+    install: 'https://unisat.io/download',
+    featured: false,
+  },
+  {
+    id: 'xverse',
+    name: 'Xverse',
+    sub: 'Bitcoin, Ordinals & Stacks',
+    icon: '✦',
+    iconStyle: 'background:#5546ff;color:#fff;font-size:1rem;font-weight:700;',
+    detect: () => !!(window.XverseProviders || (window.btc_providers && window.btc_providers.find(p=>p.id&&p.id.includes('xverse')))),
+    connect: connectXverse,
+    install: 'https://www.xverse.app/download',
+    featured: false,
+  },
+  {
+    id: 'okx',
+    name: 'OKX Wallet',
+    sub: 'Multi-chain Bitcoin Wallet',
+    icon: '⬤',
+    iconStyle: 'background:#000;color:#fff;font-size:0.8rem;font-weight:900;',
+    detect: () => !!(window.okxwallet && window.okxwallet.bitcoin),
+    connect: connectOKX,
+    install: 'https://www.okx.com/web3',
+    featured: false,
+  },
+  {
+    id: 'leather',
+    name: 'Leather',
+    sub: 'Bitcoin & Stacks Wallet',
+    icon: '🟤',
+    detect: () => !!window.LeatherProvider,
+    connect: connectLeather,
+    install: 'https://leather.io/install-extension',
+    featured: false,
+  },
+];
+
+function openModal() {
+  renderWalletOptions();
+  document.getElementById('walletModal').classList.add('show');
+}
+function closeModal() { document.getElementById('walletModal').classList.remove('show'); }
+
+function renderWalletOptions() {
+  const list = document.getElementById('wallet-options-list');
+  list.innerHTML = '';
+
+  // Section: Featured
+  const featuredLabel = document.createElement('div');
+  featuredLabel.className = 'wallet-section-label';
+  featuredLabel.textContent = '★ Recommended';
+  list.appendChild(featuredLabel);
+
+  // Section: Others
+  const othersLabel = document.createElement('div');
+  othersLabel.className = 'wallet-section-label';
+  othersLabel.style.display = 'none';
+  othersLabel.textContent = 'Other BTC Wallets';
+
+  BTC_WALLETS.forEach(w => {
+    const detected = w.detect();
+    const div = document.createElement('div');
+    div.className = 'wallet-option' + (w.featured ? ' featured' : '');
+    div.onclick = () => w.connect(w);
+
+    const iconStyle = w.iconStyle || 'background:var(--s2);';
+    const badgeHTML = w.featured
+      ? `<span class="wo-badge${detected?' detected':''}">★ ${w.badge}</span>`
+      : (detected ? `<span class="wo-badge detected">DETECTED</span>` : `<span class="wo-badge na">NOT INSTALLED</span>`);
+
+    const installLink = !detected
+      ? `<a class="wo-install" href="${w.install}" target="_blank" onclick="event.stopPropagation()">↗ Install Extension</a>`
+      : '';
+
+    div.innerHTML = `
+      <div class="wo-icon" style="${iconStyle}">${w.icon}</div>
+      <div style="flex:1;min-width:0;">
+        <div class="wo-name">${w.name}</div>
+        <div class="wo-sub">${w.sub}${installLink ? '<br>'+installLink : ''}</div>
+      </div>
+      ${badgeHTML}
+    `;
+
+    if (!detected) {
+      div.style.opacity = '0.7';
+    }
+
+    if (w.featured) {
+      list.appendChild(div);
+      list.appendChild(othersLabel);
+      othersLabel.style.display = 'block';
+    } else {
+      list.appendChild(div);
+    }
+  });
+}
+
+// ── OPNet Wallet ────────────────────────────────
+async function connectOpNet(w) {
+  try {
+    let address = '', pubkey = '';
+
+    if (window.opnet) {
+      // OP_WALLET injects window.opnet
+      const provider = window.opnet;
+      // Request accounts — OP_WALLET uses requestAccounts similar to unisat
+      let accounts;
+      if (provider.requestAccounts) {
+        accounts = await provider.requestAccounts();
+      } else if (provider.getAccounts) {
+        accounts = await provider.getAccounts();
+      }
+      if (accounts && accounts.length) {
+        address = accounts[0];
+      }
+      // Try get public key
+      if (provider.getPublicKey) {
+        pubkey = await provider.getPublicKey().catch(()=>'');
+      }
+    } else if (window.OpNetProvider) {
+      const accounts = await window.OpNetProvider.request({ method: 'btc_requestAccounts' });
+      address = accounts[0];
+    } else {
+      // Not installed — redirect to install
+      showToast('OP_WALLET not found. Redirecting to install...');
+      setTimeout(() => window.open('https://chromewebstore.google.com/detail/opwallet/pmbjpcmaaladnfpacpmhmnfmpklgbdjb', '_blank'), 800);
+      return;
+    }
+
+    if (!address) throw new Error('No accounts returned');
+    finishConnect('OP_WALLET', address, pubkey, 'opnet');
+  } catch(e) {
+    handleWalletError(e, w);
+  }
+}
+
+// ── UniSat ──────────────────────────────────────
+async function connectUniSat(w) {
+  try {
+    if (!window.unisat) {
+      promptInstall(w); return;
+    }
+    const accounts = await window.unisat.requestAccounts();
+    const pubkey = await window.unisat.getPublicKey().catch(()=>'');
+    finishConnect('UniSat', accounts[0], pubkey, 'unisat');
+  } catch(e) { handleWalletError(e, w); }
+}
+
+// ── Xverse ──────────────────────────────────────
+async function connectXverse(w) {
+  try {
+    if (!w.detect()) { promptInstall(w); return; }
+
+    // Try sats-connect style via btc_providers
+    if (window.btc_providers) {
+      const xp = window.btc_providers.find(p => p.id && p.id.toLowerCase().includes('xverse'));
+      if (xp && xp.request) {
+        const res = await xp.request('getAddresses', { purposes: ['payment', 'ordinals'] });
+        const addr = res?.result?.addresses?.[0]?.address || '';
+        finishConnect('Xverse', addr, '', 'xverse');
+        return;
+      }
+    }
+    // Fallback: XverseProviders
+    const addr = await window.XverseProviders?.BitcoinProvider?.request('getAccounts', {}).catch(()=>null);
+    finishConnect('Xverse', addr?.[0] || '', '', 'xverse');
+  } catch(e) { handleWalletError(e, w); }
+}
+
+// ── OKX ─────────────────────────────────────────
+async function connectOKX(w) {
+  try {
+    if (!window.okxwallet?.bitcoin) { promptInstall(w); return; }
+    const result = await window.okxwallet.bitcoin.requestAccounts();
+    const pubkey = await window.okxwallet.bitcoin.getPublicKey().catch(()=>'');
+    finishConnect('OKX', result[0], pubkey, 'okx');
+  } catch(e) { handleWalletError(e, w); }
+}
+
+// ── Leather ─────────────────────────────────────
+async function connectLeather(w) {
+  try {
+    if (!window.LeatherProvider) { promptInstall(w); return; }
+    const res = await window.LeatherProvider.request('getAddresses');
+    const addresses = res?.result?.addresses || [];
+    const btcAddr = addresses.find(a => a.symbol === 'BTC');
+    finishConnect('Leather', btcAddr?.address || addresses[0]?.address || '', '', 'leather');
+  } catch(e) { handleWalletError(e, w); }
+}
+
+// ── Shared helpers ───────────────────────────────
+function promptInstall(w) {
+  closeModal();
+  showToast(`${w.name} not installed. Opening install page...`);
+  setTimeout(() => window.open(w.install, '_blank'), 800);
+}
+
+function handleWalletError(e, w) {
+  console.error(w.name, e);
+  const msg = e?.message || '';
+  if (msg.includes('User rejected') || msg.includes('cancelled')) {
+    showToast('Connection cancelled by user');
+  } else {
+    showToast(`${w.name}: ${msg.slice(0,60) || 'Connection failed'}`);
+  }
+}
+
+function finishConnect(providerName, address, pubkey, providerId) {
+  closeModal();
+  if (!address) {
+    showToast('No address returned. Try again.');
+    return;
+  }
+
+  walletProvider = providerName;
+  walletAddress = address;
+  walletConnected = true;
+
+  // Display: Taproot/bc1p addresses — show first 8 + last 5
+  const isLong = address.length > 20;
+  const shortAddr = isLong ? address.slice(0,8)+'...'+address.slice(-5) : address;
+  document.getElementById('wallet-text').textContent = shortAddr;
+  document.getElementById('wallet-btn').classList.add('connected');
+  document.getElementById('wallet-dot').classList.add('pulse');
+  document.getElementById('wallet-btn').onclick = disconnectWallet;
+
+  const isOpNet = providerId === 'opnet';
+  showToast(`${isOpNet ? '⬡ OP_WALLET' : providerName} connected! ${isOpNet ? '— OPNet Ready ✓' : ''}`);
+  updateLeaderboardMyStats();
+}
+
+function disconnectWallet() {
+  walletConnected = false; walletAddress = '';
+  walletProvider = '';
+  document.getElementById('wallet-text').textContent = 'Connect Wallet';
+  document.getElementById('wallet-btn').classList.remove('connected');
+  document.getElementById('wallet-dot').classList.remove('pulse');
+  document.getElementById('wallet-btn').onclick = openModal;
+  showToast('Wallet disconnected');
+}
+
+// ═══════════════════════════════════════════════
+// GAME LOGIC
+// ═══════════════════════════════════════════════
+function newGame() {
+  grid = Array.from({length:4},()=>Array(4).fill(0));
+  score = 0; moves = 0; gameOver = false;
+  sessionEarned = 0; milestones = new Set();
+  document.getElementById('overlay').classList.remove('show');
+  addRandom(); addRandom();
+  render();
+  setAIOutput('Tekan <strong>⚡ AI Move</strong> untuk analisis papan secara real-time.');
+}
+
+function addRandom() {
+  const empty=[];
+  for(let r=0;r<4;r++) for(let c=0;c<4;c++) if(!grid[r][c]) empty.push([r,c]);
+  if(!empty.length) return null;
+  const [r,c]=empty[Math.floor(Math.random()*empty.length)];
+  grid[r][c]=Math.random()<0.9?2:4;
+  return [r,c];
+}
+
+function cloneGrid(g){return g.map(r=>[...r]);}
+
+function slideRow(row){
+  let f=row.filter(x=>x), merged=[],pts=0;
+  while(f.length){
+    if(f.length>1&&f[0]===f[1]){merged.push(f[0]*2);pts+=f[0]*2;f.splice(0,2);}
+    else{merged.push(f.shift());}
+  }
+  while(merged.length<4)merged.push(0);
+  return{row:merged,pts};
+}
+
+function rotCW(g){return g[0].map((_,i)=>g.map(r=>r[i]).reverse());}
+function rotCCW(g){return g[0].map((_,i)=>g.map(r=>r[4-1-i]));}
+
+function doMove(dir) { move(dir); }
+
+function move(dir){
+  if(gameOver) return false;
+  let g=cloneGrid(grid), pts=0;
+  if(dir==='up')    g=rotCW(g);
+  if(dir==='right') g=g.map(r=>[...r].reverse());
+  if(dir==='down')  g=rotCCW(g);
+  g=g.map(row=>{const s=slideRow(row);pts+=s.pts;return s.row;});
+  if(dir==='up')    g=rotCCW(g);
+  if(dir==='right') g=g.map(r=>[...r].reverse());
+  if(dir==='down')  g=rotCW(g);
+
+  if(JSON.stringify(g)===JSON.stringify(grid)) return false;
+
+  grid=g; score+=pts; moves++;
+  if(score>best) best=score;
+
+  // Token reward: 1 token per 100 points
+  const baseEarn = Math.floor(pts/100);
+  earnTokens(baseEarn);
+
+  // Milestone bonuses
+  const maxTile = Math.max(...grid.flat());
+  const bonuses = {128:50, 256:150, 512:400, 1024:1000, 2048:5000};
+  if(bonuses[maxTile] && !milestones.has(maxTile)){
+    milestones.add(maxTile);
+    earnTokens(bonuses[maxTile], true, maxTile);
+  }
+
+  addRandom();
+  checkGameState();
+  render();
+  return true;
+}
+
+function earnTokens(amount, isBonus=false, tile=null){
+  if(amount<=0) return;
+  tokenBalance += amount;
+  sessionEarned += amount;
+  circSupply += amount;
+  updateTokenUI();
+
+  if(isBonus && tile){
+    showToast(`🎉 TILE ${tile} BONUS: +${amount.toLocaleString()} 2048`);
+  }
+  // Floating earn FX
+  if(amount>0){
+    const fx = document.createElement('div');
+    fx.className='earn-fx';
+    fx.textContent=`+${amount} 2048`;
+    fx.style.cssText=`left:${30+Math.random()*40}%;bottom:${Math.random()*200+200}px;`;
+    document.body.appendChild(fx);
+    setTimeout(()=>fx.remove(),1500);
+  }
+}
+
+function updateTokenUI(){
+  document.getElementById('token-balance').textContent=tokenBalance.toLocaleString();
+  document.getElementById('session-earn').textContent=sessionEarned.toLocaleString();
+  document.getElementById('token-usd').textContent=`≈ $${(tokenBalance*TOKEN_PRICE).toFixed(6)}`;
+  const pct=(circSupply/SUPPLY*100).toFixed(2);
+  document.getElementById('supply-fill').style.width=pct+'%';
+  document.getElementById('supply-pct').textContent=`${pct}% distributed`;
+  document.getElementById('circ-supply').textContent=circSupply.toLocaleString();
+  document.getElementById('my-tokens-lb').textContent=tokenBalance.toLocaleString();
+}
+
+function checkGameState(){
+  // Check 2048 win
+  const maxTile=Math.max(...grid.flat());
+  for(let r=0;r<4;r++) for(let c=0;c<4;c++){
+    if(!grid[r][c]) return;
+    if(c<3&&grid[r][c]===grid[r][c+1]) return;
+    if(r<3&&grid[r][c]===grid[r+1][c]) return;
+  }
+  // No moves
+  gameOver=true;
+  document.getElementById('overlay-title').textContent = maxTile>=2048?'🏆 YOU WIN!':'Game Over';
+  document.getElementById('overlay-sub').textContent = maxTile>=2048?'REACHED 2048!':'NO MORE MOVES';
+  document.getElementById('overlay-earn').textContent='+'+sessionEarned.toLocaleString();
+  document.getElementById('overlay').classList.add('show');
+  if(walletConnected) updateLeaderboardMyStats();
+  stopAuto();
+}
+
+function render(){
+  const b=document.getElementById('board');
+  b.innerHTML='';
+  for(let r=0;r<4;r++) for(let c=0;c<4;c++){
+    const div=document.createElement('div');
+    div.className='cell';
+    const v=grid[r][c];
+    if(v){
+      div.textContent=v;
+      if(v>=1000)div.style.fontSize=v>=10000?'0.75rem':'0.95rem';
+      div.classList.add('t'+Math.min(v,2048));
+    }
+    b.appendChild(div);
+  }
+  document.getElementById('score').textContent=score.toLocaleString();
+  document.getElementById('best').textContent=best.toLocaleString();
+  document.getElementById('moves').textContent=moves;
+  document.getElementById('my-best-lb').textContent=best.toLocaleString();
+}
+
+// Keyboard
+document.addEventListener('keydown',e=>{
+  const m={ArrowUp:'up',ArrowDown:'down',ArrowLeft:'left',ArrowRight:'right'};
+  if(m[e.key]){e.preventDefault();move(m[e.key]);}
+});
+// Touch
+let tx,ty;
+document.addEventListener('touchstart',e=>{tx=e.touches[0].clientX;ty=e.touches[0].clientY;});
+document.addEventListener('touchend',e=>{
+  const dx=e.changedTouches[0].clientX-tx, dy=e.changedTouches[0].clientY-ty;
+  if(Math.max(Math.abs(dx),Math.abs(dy))<20)return;
+  Math.abs(dx)>Math.abs(dy)?move(dx>0?'right':'left'):move(dy>0?'down':'up');
+});
+
+// ═══════════════════════════════════════════════
+// AI AGENT
+// ═══════════════════════════════════════════════
+function setAIOutput(html){ document.getElementById('ai-output').innerHTML=html; }
+function setAILed(on){
+  const d=document.getElementById('ai-led');
+  on?d.classList.add('on'):d.classList.remove('on');
+}
+
+async function askAI(){
+  if(aiThinking||gameOver)return;
+  aiThinking=true;
+  document.getElementById('ai-btn').disabled=true;
+  setAILed(true);
+  setAIOutput('<span class="thinking">AI menganalisis papan</span>');
+
+  const boardStr=grid.map(r=>r.join('\t')).join('\n');
+  const prompt=`Kamu adalah ahli game 2048. Analisis papan ini dan berikan langkah terbaik.
+
+PAPAN (0=kosong):
+${boardStr}
+
+SKOR: ${score} | MAX TILE: ${Math.max(...grid.flat())}
+
+Format respons:
+LANGKAH: [UP/DOWN/LEFT/RIGHT]
+ALASAN: [maks 2 kalimat, Bahasa Indonesia]`;
+
+  try{
+    const res=await fetch("https://api.anthropic.com/v1/messages",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        model:"claude-sonnet-4-20250514",
+        max_tokens:1000,
+        system:"Kamu AI agent ahli 2048. Selalu gunakan format yang diminta. Bahasa Indonesia.",
+        messages:[{role:"user",content:prompt}],
+        mcp_servers:[{type:"url",url:MCP_URL,name:"opnet-mcp"}]
+      })
+    });
+    const data=await res.json();
+    const text=data.content?.map(b=>b.text||'').join('')||'';
+    const moveMatch=text.match(/LANGKAH:\s*(UP|DOWN|LEFT|RIGHT)/i);
+    const reasonMatch=text.match(/ALASAN:\s*(.+?)(?:\n|$)/i);
+
+    if(moveMatch){
+      const dir=moveMatch[1].toLowerCase();
+      const reason=reasonMatch?reasonMatch[1].trim():'';
+      const arrows={up:'↑ UP',down:'↓ DOWN',left:'← LEFT',right:'→ RIGHT'};
+      setAIOutput(`<span class="ai-move-tag">${arrows[dir]}</span>\n\n${reason}`);
+      setTimeout(()=>move(dir),400);
+    } else {
+      const fb=text.match(/\b(UP|DOWN|LEFT|RIGHT)\b/i);
+      if(fb){const dir=fb[1].toLowerCase();setAIOutput(`<span class="ai-move-tag">${dir.toUpperCase()}</span>\n\n${text}`);setTimeout(()=>move(dir),400);}
+      else setAIOutput(text||'Tidak dapat menentukan langkah.');
+    }
+  } catch(err){
+    const best=heuristic();
+    const arrows={up:'↑ UP',down:'↓ DOWN',left:'← LEFT',right:'→ RIGHT'};
+    setAIOutput(`<span class="ai-move-tag">${arrows[best]}</span>\n\n[Offline] Heuristik lokal aktif.`);
+    setTimeout(()=>move(best),400);
+  }
+
+  aiThinking=false;
+  document.getElementById('ai-btn').disabled=false;
+  setAILed(false);
+}
+
+function heuristic(){
+  const dirs=['left','up','down','right'];
+  let bst=null,bstScore=-1;
+  for(const d of dirs){
+    const sg=cloneGrid(grid),ss=score;
+    if(move(d)){
+      const sc=score+emptyCount()*20;
+      if(sc>bstScore){bstScore=sc;bst=d;}
+      grid=sg;score=ss;render();
+    }
+  }
+  return bst||'left';
+}
+function emptyCount(){let n=0;for(let r=0;r<4;r++)for(let c=0;c<4;c++)if(!grid[r][c])n++;return n;}
+
+function toggleAuto(){
+  autoMode=!autoMode;
+  document.getElementById('auto-toggle').classList.toggle('on',autoMode);
+  autoMode?startAuto():stopAuto();
+}
+function startAuto(){
+  if(autoTimer)return;
+  autoTimer=setInterval(()=>{if(!aiThinking&&!gameOver)askAI();},2400);
+}
+function stopAuto(){
+  autoMode=false;document.getElementById('auto-toggle').classList.remove('on');
+  clearInterval(autoTimer);autoTimer=null;
+}
+
+// ═══════════════════════════════════════════════
+// LEADERBOARD
+// ═══════════════════════════════════════════════
+const MOCK_WALLETS = [
+  ['0x71C7...f3E2','342,880',  '3,428', '2048'],
+  ['0xA93b...1dF8','287,440',  '2,874', '2048'],
+  ['0x04aF...9cC1','201,200',  '2,012', '1024'],
+  ['0xDe12...7b39','188,660',  '1,886', '1024'],
+  ['0xF501...2aA0','155,320',  '1,553', '512'],
+  ['0x3391...8bBc','144,000',  '1,440', '512'],
+  ['0x8Fc7...d4E3','132,800',  '1,328', '256'],
+  ['0x22aA...cC99','121,600',  '1,216', '256'],
+  ['0x9b11...0eE7','110,400',  '1,104', '128'],
+  ['0x5D3e...f1A6','98,800',   '988',   '128'],
+];
+
+function renderLeaderboard(){
+  const tbody=document.getElementById('lb-body');
+  tbody.innerHTML='';
+  const data=[...MOCK_WALLETS];
+
+  // Add current player if connected
+  let myRank='—';
+  if(walletConnected&&best>0){
+    const shortAddr=walletAddress.slice(0,6)+'...'+walletAddress.slice(-4);
+    let inserted=false;
+    for(let i=0;i<data.length;i++){
+      if(best>parseInt(data[i][1].replace(/,/g,''))){
+        data.splice(i,0,[shortAddr,best.toLocaleString(),tokenBalance.toLocaleString(),Math.max(...grid.flat()).toString()]);
+        myRank=i+1;inserted=true;break;
+      }
+    }
+    if(!inserted){data.push([shortAddr,best.toLocaleString(),tokenBalance.toLocaleString(),'—']);myRank=data.length;}
+  }
+
+  if(currentLbTab==='token'){
+    data.sort((a,b)=>parseInt(b[2].replace(/,/g,''))-parseInt(a[2].replace(/,/g,'')));
+  }
+
+  const rankClass=['rank-1','rank-2','rank-3'];
+  data.slice(0,12).forEach((row,i)=>{
+    const tr=document.createElement('tr');
+    const isMe=walletConnected&&row[0].startsWith(walletAddress.slice(0,6));
+    if(isMe)tr.className='my-row';
+    const rn=i+1;
+    const rLabel=rn<=3?`<span class="${rankClass[rn-1]}">${['🥇','🥈','🥉'][rn-1]}</span>`:rn;
+    tr.innerHTML=`<td>${rLabel}</td><td class="addr-cell">${row[0]}${isMe?' <span style="color:var(--g1);font-size:0.6rem;">[YOU]</span>':''}</td><td class="score-cell">${row[1]}</td><td class="token-cell">${row[2]}</td><td style="color:var(--g2)">${row[3]}</td>`;
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById('my-rank').textContent=walletConnected?myRank:'—';
+}
+
+function updateLeaderboardMyStats(){
+  document.getElementById('my-rank').textContent=walletConnected?'#'+Math.floor(Math.random()*50+5):'—';
+  document.getElementById('my-best-lb').textContent=best.toLocaleString();
+  document.getElementById('my-tokens-lb').textContent=tokenBalance.toLocaleString();
+}
+
+function refreshLeaderboard(){
+  showToast('Leaderboard refreshed!');
+  renderLeaderboard();
+}
+
+// ═══════════════════════════════════════════════
+// TOAST
+// ═══════════════════════════════════════════════
+let toastTimer;
+function showToast(msg){
+  const t=document.getElementById('toast');
+  document.getElementById('toast-msg').innerHTML=msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.classList.remove('show'),3000);
+}
+
+// ═══════════════════════════════════════════════
+// SWAP WAITLIST
+// ═══════════════════════════════════════════════
+function joinWaitlist(){ showToast('✦ Added to waitlist!'); }
+
+// ═══════════════════════════════════════════════
+// SIMULATE live player count
+// ═══════════════════════════════════════════════
+setInterval(()=>{
+  const c=parseInt(document.getElementById('player-count').textContent.replace(/,/g,''));
+  const delta=Math.floor(Math.random()*5)-2;
+  document.getElementById('player-count').textContent=(c+delta).toLocaleString();
+},4000);
+
+// ═══════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════
+newGame();
+renderLeaderboard();
+</script>
+</body>
+</html>
